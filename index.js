@@ -5,6 +5,7 @@ const fetch = require("node-fetch");
 
 const AWS_CLIENTID = "4qte47jbstod8apnfic0bunmrq";
 const AWS_USERPOOLID = "us-east-2_ghlOXVLi1";
+const AWS_REGION = "us-east-2";
 
 function kwhs2w(v) {
     return 60 * 60 * 1000 * v;
@@ -47,13 +48,48 @@ class Api {
         return this;
 	}
 
+    async refreshTokens() {
+        const res = await fetch(`https://cognito-idp.${AWS_REGION}.amazonaws.com/`, {
+            method: "POST",
+            headers: {
+                "X-Amz-Target": "AWSCognitoIdentityProviderService.InitiateAuth",
+				"Content-Type": "application/x-amz-json-1.1"
+            },
+            body: JSON.stringify({
+                ClientId: AWS_CLIENTID,
+				AuthFlow: "REFRESH_TOKEN_AUTH",
+				AuthParameters: {
+                    SECRET_HASH: AWS_USERPOOLID,
+					REFRESH_TOKEN: this.refresh
+				}
+            })
+        });
+        const json = await res.json();
+        const tokens = json.AuthenticationResult;
+        if (tokens.AccessToken) {
+            this.access = tokens.AccessToken;
+        }
+        if (tokens.IdToken) {
+            this.idtoken = tokens.IdToken;
+        }
+    }
+
     async getDevices() {
-        const res = await fetch("https://api.emporiaenergy.com/customers/devices", {
+        let res = await fetch("https://api.emporiaenergy.com/customers/devices", {
             method: "GET",
             headers: {
                 authtoken: this.idtoken
             }
         });
+        if (res.status === 401) {
+            await this.refreshTokens();
+            res = await fetch("https://api.emporiaenergy.com/customers/devices", {
+                method: "GET",
+                headers: {
+                    authtoken: this.idtoken
+                }
+            });
+        }
         const json = await res.json();
         const r = [];
         const devices = json.devices;
@@ -82,12 +118,21 @@ class Api {
             names[d.name] = d;
             dgids[d.dgid] = true;
         });
-        const res = await fetch(`https://api.emporiaenergy.com/AppAPI?apiMethod=getDeviceListUsages&deviceGids=${Object.keys(dgids).join("+")}&instant=${new Date().toISOString()}&scale=${interval}&energyUnit=KilowattHours`, {
+        let res = await fetch(`https://api.emporiaenergy.com/AppAPI?apiMethod=getDeviceListUsages&deviceGids=${Object.keys(dgids).join("+")}&instant=${new Date().toISOString()}&scale=${interval}&energyUnit=KilowattHours`, {
             method: "GET",
             headers: {
                 authtoken: this.idtoken
             }
         });
+        if (res.status === 401) {
+            await this.refreshTokens();
+            res = await fetch(`https://api.emporiaenergy.com/AppAPI?apiMethod=getDeviceListUsages&deviceGids=${Object.keys(dgids).join("+")}&instant=${new Date().toISOString()}&scale=${interval}&energyUnit=KilowattHours`, {
+                method: "GET",
+                headers: {
+                    authtoken: this.idtoken
+                }
+            });
+        }
         const json = await res.json();
         const r = [];
         const channels = json.deviceListUsages.devices[0].channelUsages;
