@@ -1,0 +1,23 @@
+{
+  "name": "emporiavue",
+  "version": "1.0.0",
+  "description": "Emporia Vue API Client",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aanon4/emporiavue.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/aanon4/emportiavue/issues"
+  },
+  "homepage": "https://github.com/aanon4/emporiavue#readme",
+  "dependencies": {
+    "amazon-cognito-identity-js-node": "^0.0.3",
+    "node-fetch": "^2.7.0"
+  }
+}
