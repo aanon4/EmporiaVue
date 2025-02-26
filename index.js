@@ -94,17 +94,28 @@ class Api {
         const r = [];
         const devices = json.devices;
         for (let i = 0; i < devices.length; i++) {
-            const subdevices = devices[i].devices;
+            const device = devices[i];
+            const subdevices = device.devices;
             for (let j = 0; j < subdevices.length; j++) {
                 const channels = subdevices[j].channels;
                 for (let k = 0; k < channels.length; k++) {
                     const c = channels[k];
-                    if (c.name) {
-                        r.push({
-                            name: c.name,
-                            dgid: c.deviceGid
-                        });
-                    }
+                    r.push({
+                        name: c.name || `Vue ${k + 1}`,
+                        dgid: c.deviceGid,
+                        channel: c.channelNum
+                    });
+                }
+            }
+            const channels = device.channels;
+            for (let k = 0; k < channels.length; k++) {
+                const c = channels[k];
+                if (c.type === "Main") {
+                    r.push({
+                        name: device.locationProperties.displayName || `Vue: ${device.deviceGid}`,
+                        dgid: c.deviceGid,
+                        channel: c.channelNum
+                    });
                 }
             }
         }
@@ -115,7 +126,7 @@ class Api {
         const dgids = {};
         const names = {};
         devices.forEach((d) => {
-            names[d.name] = d;
+            names[`${d.dgid}:${d.channel}`] = d;
             dgids[d.dgid] = true;
         });
         let res = await fetch(`https://api.emporiaenergy.com/AppAPI?apiMethod=getDeviceListUsages&deviceGids=${Object.keys(dgids).join("+")}&instant=${new Date().toISOString()}&scale=${interval}&energyUnit=KilowattHours`, {
@@ -142,17 +153,15 @@ class Api {
                 const subchannels = c.nestedDevices[0].channelUsages;
                 for (let k = 0; k < subchannels.length; k++) {
                     const sc = subchannels[k];
-                    const name = sc.name;
-                    if (names[name]) {
-                        names[name].usage = sc.usage;
+                    const id = `${sc.deviceGid}:${sc.channelNum}`
+                    if (names[id]) {
+                        names[id].usage = sc.usage;
                     }
                 }
             }
-            else {
-                const name = c.name;
-                if (names[name]) {
-                    names[name].usage = c.usage;
-                }
+            const id = `${c.deviceGid}:${c.channelNum}`
+            if (names[id]) {
+                names[id].usage = c.usage;
             }
         }
         return devices;
