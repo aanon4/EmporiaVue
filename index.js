@@ -75,14 +75,14 @@ class Api {
         return r;
     }
 
-    async getDeviceUsage(devices) {
+    async getDeviceTimedUsage(interval, devices) {
         const dgids = {};
         const names = {};
         devices.forEach((d) => {
             names[d.name] = d;
             dgids[d.dgid] = true;
         });
-        const res = await fetch(`https://api.emporiaenergy.com/AppAPI?apiMethod=getDeviceListUsages&deviceGids=${Object.keys(dgids).join("+")}&instant=${new Date().toISOString()}&scale=1S&energyUnit=KilowattHours`, {
+        const res = await fetch(`https://api.emporiaenergy.com/AppAPI?apiMethod=getDeviceListUsages&deviceGids=${Object.keys(dgids).join("+")}&instant=${new Date().toISOString()}&scale=${interval}&energyUnit=KilowattHours`, {
             method: "GET",
             headers: {
                 authtoken: this.idtoken
@@ -99,14 +99,14 @@ class Api {
                     const sc = subchannels[k];
                     const name = sc.name;
                     if (names[name]) {
-                        names[name].watts = kwhs2w(sc.usage);
+                        names[name].usage = sc.usage;
                     }
                 }
             }
             else {
                 const name = c.name;
                 if (names[name]) {
-                    names[name].watts = kwhs2w(c.usage);
+                    names[name].usage = c.usage;
                 }
             }
         }
