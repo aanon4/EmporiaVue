@@ -101,6 +101,7 @@ class Api {
                 for (let k = 0; k < channels.length; k++) {
                     const c = channels[k];
                     r.push({
+                        type: "monitor",
                         name: c.name || `Vue ${k + 1}`,
                         dgid: c.deviceGid,
                         channel: c.channelNum
@@ -108,14 +109,25 @@ class Api {
                 }
             }
             const channels = device.channels;
-            for (let k = 0; k < channels.length; k++) {
-                const c = channels[k];
-                if (c.type === "Main") {
-                    r.push({
-                        name: device.locationProperties.displayName || `Vue: ${device.deviceGid}`,
-                        dgid: c.deviceGid,
-                        channel: c.channelNum
-                    });
+            if (device.outlet) {
+                r.push({
+                    type: "outlet",
+                    name: device.locationProperties.displayName || `Outlet: ${device.manufacturerDeviceId.substr(-6)}`,
+                    dgid: device.deviceGid,
+                    channel: channels[0].channelNum
+                });
+            }
+            else {
+                for (let k = 0; k < channels.length; k++) {
+                    const c = channels[k];
+                    if (c.type === "Main") {
+                        r.push({
+                            type: "monitor",
+                            name: device.locationProperties.displayName || `Vue: ${device.deviceGid}`,
+                            dgid: c.deviceGid,
+                            channel: c.channelNum
+                        });
+                    }
                 }
             }
         }
@@ -146,25 +158,87 @@ class Api {
         }
         const json = await res.json();
         const r = [];
-        const channels = json.deviceListUsages.devices[0].channelUsages;
-        for (let i = 0; i < channels.length; i++) {
-            const c = channels[i];
-            if (c.nestedDevices.length) {
-                const subchannels = c.nestedDevices[0].channelUsages;
-                for (let k = 0; k < subchannels.length; k++) {
-                    const sc = subchannels[k];
-                    const id = `${sc.deviceGid}:${sc.channelNum}`
-                    if (names[id]) {
-                        names[id].usage = sc.usage;
+        const devicelist = json.deviceListUsages.devices;
+        for (let x = 0; x < devicelist.length; x++) {
+            const channels = devicelist[x].channelUsages;
+            for (let i = 0; i < channels.length; i++) {
+                const c = channels[i];
+                for (let j = 0; j < c.nestedDevices.length; j++) {
+                    const subchannels = c.nestedDevices[j].channelUsages;
+                    for (let k = 0; k < subchannels.length; k++) {
+                        const sc = subchannels[k];
+                        const id = `${sc.deviceGid}:${sc.channelNum}`
+                        if (names[id]) {
+                            names[id].usage = sc.usage;
+                        }
                     }
                 }
-            }
-            const id = `${c.deviceGid}:${c.channelNum}`
-            if (names[id]) {
-                names[id].usage = c.usage;
+                const id = `${c.deviceGid}:${c.channelNum}`;
+                if (names[id]) {
+                    names[id].usage = c.usage;
+                }
             }
         }
         return devices;
+    }
+
+    async getOutletState(devices) {
+        const names = {};
+        devices.forEach((d) => {
+            if (d.type === "outlet") {
+                names[`${d.dgid}`] = d;
+            }
+        });
+        let res = await fetch(`https://api.emporiaenergy.com/customers/devices/status`, {
+            method: "GET",
+            headers: {
+                authtoken: this.idtoken
+            }
+        });
+        if (res.status === 401) {
+            await this.refreshTokens();
+            res = await fetch(`https://api.emporiaenergy.com/customers/devices/status`, {
+                method: "GET",
+                headers: {
+                    authtoken: this.idtoken
+                }
+            });
+        }
+        const json = await res.json();
+        json.outlets.forEach(outlet => {
+            if (names[outlet.deviceGid]) {
+                names[outlet.deviceGid].on = outlet.outletOn;
+            }
+        });
+        return devices;
+    }
+
+    async updateOutletState(outlet) {
+        const body = JSON.stringify({
+            deviceGid: outlet.dgid,
+            outletOn: outlet.on
+        });
+        let res = await fetch(`https://api.emporiaenergy.com/devices/outlet`, {
+            method: "PUT",
+            headers: {
+                authtoken: this.idtoken,
+                "Content-Type": "application/json"
+            },
+            body: body
+        });
+        if (res.status === 401) {
+            await this.refreshTokens();
+            res = await fetch(`https://api.emporiaenergy.com/devices/outlet`, {
+                method: "PUT",
+                headers: {
+                    authtoken: this.idtoken,
+                    "Content-Type": "application/json"
+                },
+                body: body
+            });
+        }
+        await res.json();
+        return res.ok;
     }
 
 }
