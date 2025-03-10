@@ -1,6 +1,6 @@
 {
   "name": "emporiavue",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Emporia Vue API Client",
   "main": "index.js",
   "scripts": {
